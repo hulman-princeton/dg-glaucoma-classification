@@ -1,26 +1,18 @@
-import numpy as np
-import matplotlib.pyplot as plt
 import time
 import os
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 import torch.optim as optim
-import torch.backends.cudnn as cudnn
-import torchvision
-import sklearn.metrics
 
-from torch.optim import lr_scheduler
-from torchvision import datasets, models, transforms
+from torchvision import models, transforms
 from torchvision.datasets import ImageFolder
-from torch.utils.data.sampler import SubsetRandomSampler
 from torch.utils.data.dataloader import DataLoader
-from sklearn.metrics import roc_auc_score, roc_curve, confusion_matrix, ConfusionMatrixDisplay
-from PIL import Image
 from tempfile import TemporaryDirectory
+from ultralytics import YOLO
+from os.path import join
 
 
-def calc_data_moments(data_dir):
+def calculate_data_moments(data_dir):
 
     '''
     Calculate mean and standard deviation of retinal image dataset.
@@ -59,16 +51,16 @@ def calc_data_moments(data_dir):
     return means, std_devs
 
 
-def load_data_from_dir(
-        data_dir, 
-        means, 
-        std_devs, 
-        batch_size=16, 
-        shuffle=True
-    ):
+def load_data_from_directory(
+    data_dir, 
+    means, 
+    std_devs, 
+    batch_size=16, 
+    shuffle=True
+):
 
     '''
-    Load data from directory into torch ImageFolder
+    Load data from directory into torch ImageFolder.
 
     Args:
         data_dir (str): Absolute path to dataset directory containing 0 (healthy) and 1 (glaucoma) folders of retinal images.
@@ -97,12 +89,61 @@ def load_data_from_dir(
     return data_loader
 
 
+def finetune_resnet101(
+    train_dataloader,
+    val_dataloader,
+    output_dir,
+    n_cls=2,
+    n_epochs=100,
+    lr=0.001,
+    betas=(0.9,0.999)
+):
+
+    '''
+    Initialize ResNet101 model to prepare for finetuning.
+
+    Args:
+        train_dataloader (torch DataLoader): Dataloader of training data.
+        val_dataloader (torch DataLoader): Dataloader of validation data.
+        output_dir (str): Complete path to save model checkpoints.
+        n_cls (int): Number of classes in the training dataset.
+        n_epochs (int): Number of epochs to train model.
+        lr (float): Learning rate for Adam optimizer.
+        betas (tuple[float,float]): Betas for Adam optimizer.
+    '''
+
+    # create dictionary of dataloaders
+    dataloaders = {'train': train_dataloader, 'val': val_dataloader}
+
+    # load model from PyTorch
+    model = models.resnet101(weights='DEFAULT')
+
+    # re-initialize final fully-connected layer
+    num_ftrs = model.fc.in_features
+    model.fc = nn.Linear(num_ftrs, n_cls)
+
+    # define loss and optimizer
+    criterion = nn.CrossEntropyLoss(weight=None)
+    optimizer = optim.Adam(model.parameters(), lr=lr, betas=betas)
+
+    # train model
+    train_model(
+        dataloaders,
+        model,
+        criterion,
+        optimizer,
+        n_epochs,
+        output_dir
+    )
+
+
 def train_model(
+    dataloaders,
     model,
     criterion,
     optimizer,
-    num_epochs,
-    outpath
+    n_epochs,
+    output_dir
 ):
     
     '''
@@ -112,20 +153,159 @@ def train_model(
     Train deep learning model.
 
     Args:
-        model (ModelClass): Model architecture with initial weights.
-        criterion
-        optimizer
-        num_epochs (int): Number of epochs to train model.
-        outpath (str): Where to save best model state dict.
+        dataloaders (dict(torch DataLoader)): Dictionary of training and testing dataloaders.
+        model (torch Module): ResNet101 model initialized with default weights.
+        criterion (torch Module): Loss function to evaluate model accuracy during training.
+        optimizer (torch Optimizer): Optimizer to identify training step.
+        n_epochs (int): Number of epochs to train model.
+        output_dir (str): Complete path to save model checkpoints.
     '''
 
-    # TODO
+    # send model to device
+    # GPU if available, otherwise CPU
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    model = model.to(device)
+
+    since = time.time()
+
+    # Create a temporary directory to save training checkpoints
+    with TemporaryDirectory() as tempdir:
+        best_model_params_path = os.path.join(tempdir, 'best_model_params.pt')
+
+        torch.save(model.state_dict(), best_model_params_path)
+        best_acc = 0.0
+
+        for epoch in range(n_epochs):
+            print(f'Epoch {epoch}/{n_epochs - 1}')
+            print('-' * 10)
+
+            # Each epoch has a training and validation phase
+            for phase in ['train', 'val']:
+                if phase == 'train':
+                    model.train()  # Set model to training mode
+                else:
+                    model.eval()   # Set model to evaluate mode
+
+                running_loss = 0.0
+                running_corrects = 0
+
+                # Iterate over data.
+                for inputs, labels in dataloaders[phase]:
+                    inputs = inputs.to(device)
+                    labels = labels.to(device)
+
+                    # zero the parameter gradients
+                    optimizer.zero_grad()
+
+                    # forward
+                    # track history if only in train
+                    with torch.set_grad_enabled(phase == 'train'):
+                        outputs = model(inputs)
+                        _, preds = torch.max(outputs, 1)
+                        loss = criterion(outputs, labels)
+
+                        # backward + optimize only if in training phase
+                        if phase == 'train':
+                            loss.backward()
+                            optimizer.step()
+
+                    # statistics
+                    running_loss += loss.item() * inputs.size(0)
+                    running_corrects += torch.sum(preds == labels.data)
+
+                epoch_loss = running_loss / len(dataloaders[phase].dataset)
+                epoch_acc = running_corrects.double() / len(dataloaders[phase].dataset)
+
+                print(f'{phase} Loss: {epoch_loss:.4f} Acc: {epoch_acc:.4f}')
+
+                # deep copy the model
+                if phase == 'val' and epoch_acc >= best_acc:
+                    best_acc = epoch_acc
+                    torch.save(model.state_dict(), best_model_params_path)
+
+            print()
+
+        time_elapsed = time.time() - since
+        print(f'Training complete in {time_elapsed // 60:.0f}m {time_elapsed % 60:.0f}s')
+        print(f'Best val Acc: {best_acc:4f}')
+
+        # save best model weights
+        model.load_state_dict(torch.load(best_model_params_path))
+        torch.save(model.state_dict(), output_dir)
 
 
-def initialize_model():
+def finetune_yolov8(
+    data_dir,
+    output_dir,
+    batch_size=32,
+    n_epochs=100,
+    dim=224
+):
 
     '''
-    Initialize deep learning model to prepare for finetuning.
+    Initialize and train YOLOv8 model.
+
+    Args:
+        data_dir (str): Complete path to data folder.
+        output_dir (str): Complete path to save model checkpoints.
+        batch_size (int): Batch size for training.
+        n_epochs (int): Number of epochs to train model.
+        dim (int): Dimension of square training images.
     '''
 
-    # TODO
+    # initialize YOLOv8 model
+    model = YOLO('yolov8n-cls.pt')
+
+    # train model and save checkpoints to directory
+    model.train(
+        data=data_dir, 
+        batch=batch_size, 
+        epochs=n_epochs, 
+        imgsz=dim,
+        project=output_dir
+    )
+
+
+def finetune(
+    data_dir,
+    output_dir,
+    model_name='YOLOv8'
+):
+    
+    '''
+    Prepare data and fine-tune selected model.
+    '''
+
+    if model_name == 'YOLOv8':
+        # fine-tune YOLOv8
+        finetune_yolov8(data_dir, output_dir)
+
+    elif model_name == 'ResNet101':
+
+        # get train and val paths
+        train_dir = join(data_dir, 'train')
+        val_dir = join(data_dir, 'val')
+
+        # calculate training data moments
+        train_mean, train_std_dev = calculate_data_moments(train_dir)
+
+        # create train and val dataloaders
+        # normalized by training data moments
+        train_dataloader = load_data_from_directory(
+            train_dir,
+            train_mean,
+            train_std_dev
+        )
+
+        val_dataloader = load_data_from_directory(
+            val_dir,
+            train_mean,
+            train_std_dev
+        )
+
+        # fine-tune ResNet101
+        finetune_resnet101(
+            train_dataloader,
+            val_dataloader,
+            output_dir
+        )
