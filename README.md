@@ -20,16 +20,16 @@ You may download the full datasets here:
 - RIM-ONE: https://github.com/miag-ull/rim-one-dl
 
 ### Data Directory Structure
-├── dataset_name/
-│ ├── train/
-│ │ ├── 0/ # healthy
-│ │ ├── 1/ # glaucoma
-│ ├── val/
-│ │ ├── 0/ # healthy
-│ │ ├── 1/ # glaucoma
-│ ├── test/
-│ │ ├── 0/ # healthy
-│ │ ├── 1/ # glaucoma
+- `dataset_name/`  
+  - `train/`
+      - `0/` - healthy
+      - `1/` - glaucoma
+  - `val/`
+      - `0/` - healthy
+      - `1/` - glaucoma
+  - `test/`
+      - `0/` - healthy
+      - `1/` - glaucoma
 
 ## Results
 
