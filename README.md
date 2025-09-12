@@ -19,6 +19,18 @@ You may download the full datasets here:
 - ACRIMA: https://figshare.com/s/c2d31f850af14c5b5232
 - RIM-ONE: https://github.com/miag-ull/rim-one-dl
 
+### Data Directory Structure
+├── dataset_name/
+│ ├── train/
+│ │ ├── 0/ # healthy
+│ │ ├── 1/ # glaucoma
+│ ├── val/
+│ │ ├── 0/ # healthy
+│ │ ├── 1/ # glaucoma
+│ ├── test/
+│ │ ├── 0/ # healthy
+│ │ ├── 1/ # glaucoma
+
 ## Results
 
 ### Region-of-Interest Extraction
