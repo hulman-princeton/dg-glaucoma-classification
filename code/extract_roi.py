@@ -8,9 +8,12 @@ DOI: 10.1109/ICIEA.2010.5515221.
 import numpy as np
 import pandas as pd
 import math
+import os
+import matplotlib.pyplot as plt
 
 from PIL import Image
 from skimage.draw import disk
+from os.path import join
 
 
 def pad_array(array):
@@ -26,7 +29,7 @@ def pad_array(array):
     '''
 
     # get array shape
-    n_rows, n_cols = array.shape[:1]
+    n_rows, n_cols = array.shape[:2]
 
     # return if already square
     if n_rows == n_cols:
@@ -38,24 +41,28 @@ def pad_array(array):
 
     # get amount of padding on each side of shorter edge
     extra = dim - min(n_rows, n_cols)
-    pad = extra // 2
-
-    # correction for 1 even, 1 odd edge
-    if extra % 2 != 0:
-        pad = math.ceil(pad)
-    else: 
-        pad = int(pad)
+    pad = int(extra / 2)
 
     # create square zero array 
     padded_array = np.zeros((dim,dim,3))
 
     # pad horizontally
     if n_rows > n_cols:
-        padded_array[:, pad-1:dim-pad-1] = array
+
+        # correction for uneven padding on odd edge
+        if extra % 2 != 0:
+            padded_array[:, pad:dim-pad-1] = array
+
+        # even padding
+        else:
+            padded_array[:, pad-1:dim-pad-1] = array
 
     # pad vertically
     else:
-        padded_array[pad-1:dim-pad-1] = array
+        if extra % 2 != 0:
+            padded_array[pad:dim-pad-1] = array
+        else:
+            padded_array[pad-1:dim-pad-1] = array
 
     return padded_array
 
@@ -203,15 +210,23 @@ def algorithm_iteration(img, first_pass):
     Run a single iteration of ROI extraction algorithm.
 
     Args:
-        img (nd array): Image from which to extract ROI.
+        img (PIL Image): Image on which to run ROI extraction algorithm.
         first_pass (boolean): Whether to run first or second round of algorithm.
 
     Returns:
-        roi_img (nd array): ROI image array.
+        roi_img (PIL Image): ROI image.
     '''
 
     # convert to numpy array
     img_array = np.array(img)
+
+    # check for incorrect dimensions
+    # grayscale --> rgb
+    if img_array.ndim == 2:
+        img_array = np.dstack([img_array, img_array, img_array])
+    # remove rgb alpha channel
+    elif img_array.ndim == 3 and img_array.shape[2] == 4:
+        img_array = img_array[:,:,:3]
 
     # get square padded array
     padded_array = pad_array(img_array)
@@ -253,10 +268,10 @@ def extract_roi(img_array):
     Run both rounds of ROI extraction algorithm on single image.
 
     Args:
-        img_array (nd array): Image array from which to extract ROI.
+        img_array (PIL Image): Image from which to extract ROI.
 
     Returns:
-        roi_img (nd array): ROI image array.
+        roi_img (PIL Image): ROI image.
     '''
 
     # run two iterations of roi algorithm
@@ -264,3 +279,25 @@ def extract_roi(img_array):
     roi_img = algorithm_iteration(first_pass_img, first_pass=False)
 
     return roi_img
+
+
+def main():
+
+    input_dir = '/path/to/original/images'
+    output_dir = '/path/to/save/roi/images'
+
+    # iterate through image files in folder
+    for filename in os.listdir(input_dir):
+        
+        # open image
+        img = Image.open(join(input_dir, filename))
+
+        # extract ROI
+        roi_img = extract_roi(img)
+
+        # save ROI image
+        roi_img.save(join(output_dir,filename))        
+
+
+if __name__ == "__main__":
+    main()
