@@ -22,14 +22,14 @@ You may download the full datasets here:
 ### Data Directory Structure
 - `dataset_name/`  
   - `train/`
-      - `0/` - healthy
-      - `1/` - glaucoma
+      - `0/` healthy
+      - `1/` glaucoma
   - `val/`
-      - `0/` - healthy
-      - `1/` - glaucoma
+      - `0/`
+      - `1/`
   - `test/`
-      - `0/` - healthy
-      - `1/` - glaucoma
+      - `0/`
+      - `1/`
 
 ## Results
 
