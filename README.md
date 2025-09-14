@@ -45,8 +45,9 @@ https://doi.org/10.48550/arXiv.1512.03385)) and YOLOv8 ([Redmon et al., 2016](ht
 <img src="results/baseline_performance.png" alt="Baseline Performance" width="500">
 <img src="results/roc_curves.png" alt="ROC Curves" width="500">
 
+### Feature Extraction
+<img src="results/baseline_feature_extraction.png" alt="Feature Extraction" width="500">
+
 ### Domain Generalization Method Performance
 <img src="results/dg_performance.png" alt="Domain Generalization Performance" width="500">
-
-### Feature Extraction
-<img src="results/feature_extraction.png" alt="Feature Extraction" width="500">
+<img src="results/dg_feature_extraction.png" alt="Feature Extraction" width="500">
