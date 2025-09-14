@@ -146,7 +146,7 @@ def predict_yolov8_batch(
     return np.array(labels), np.array(preds), np.array(probs)
 
 
-def predict_datasets(
+def predict(
     data_dir,
     dataset_names,
     model_path,
@@ -164,6 +164,7 @@ def predict_datasets(
         model_path (str): Complete path to fine-tuned model state dict.
         training_dataset_name (str): Name of dataset used to fine-tune model.
         show_plot (bool): Whether to display ROC curves plot in addition to saving.
+        model_type (str): Type of deep learning model.
     '''
 
     if model_type == 'ResNet101':
