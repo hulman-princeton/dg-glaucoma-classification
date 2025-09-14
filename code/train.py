@@ -3,6 +3,7 @@ import os
 import torch
 import torch.nn as nn
 import torch.optim as optim
+import yaml
 
 from torchvision import models, transforms
 from torchvision.datasets import ImageFolder
@@ -10,6 +11,8 @@ from torch.utils.data.dataloader import DataLoader
 from tempfile import TemporaryDirectory
 from ultralytics import YOLO
 from os.path import join
+from pathlib import Path
+from collections import defaultdict
 
 
 def calculate_data_moments(data_dir):
@@ -66,8 +69,8 @@ def load_data_from_directory(
         data_dir (str): Absolute path to dataset directory containing 0 (healthy) and 1 (glaucoma) folders of retinal images.
         means (torch Tensor): RGB channel means to normalize dataset.
         std_devs (torch Tensor): RBG channel standard deviations to normalize dataset.
-        batch_size (int): Batch size for DataLoader.
-        shuffle (boolean): Whether to shuffle data in DataLoader.
+        batch_size (int or 'full'): Batch size for DataLoader.
+        shuffle (bool): Whether to shuffle data in DataLoader.
 
     Returns:
         data_loader (torch DataLoader): DataLoader object containing transformed image batches.
@@ -84,36 +87,32 @@ def load_data_from_directory(
     data_folder = ImageFolder(data_dir, transforms.Compose(transforms))
 
     # create data loader from image folder
+    if batch_size == 'full':
+        batch_size = len(data_folder)
     data_loader = DataLoader(dataset=data_folder, batch_size=batch_size, shuffle=shuffle)
 
     return data_loader
 
 
-def finetune_resnet101(
-    train_dataloader,
-    val_dataloader,
-    output_dir,
+def initialize_resnet101_for_training(
     n_cls=2,
-    n_epochs=100,
     lr=0.001,
     betas=(0.9,0.999)
 ):
 
     '''
-    Initialize ResNet101 model to prepare for finetuning.
+    Initialize ResNet101 model for training.
 
     Args:
-        train_dataloader (torch DataLoader): Dataloader of training data.
-        val_dataloader (torch DataLoader): Dataloader of validation data.
-        output_dir (str): Complete path to save model checkpoints.
         n_cls (int): Number of classes in the training dataset.
-        n_epochs (int): Number of epochs to train model.
         lr (float): Learning rate for Adam optimizer.
         betas (tuple[float,float]): Betas for Adam optimizer.
-    '''
 
-    # create dictionary of dataloaders
-    dataloaders = {'train': train_dataloader, 'val': val_dataloader}
+    Returns:
+        model (torch Module): ResNet101 module initialized for fine-tuning.
+        criterion (torch Module): Loss function to evaluate model accuracy during training.
+        optimizer (torch Optimizer): Optimizer to update training step.
+    '''
 
     # load model from PyTorch
     model = models.resnet101(weights='DEFAULT')
@@ -126,15 +125,7 @@ def finetune_resnet101(
     criterion = nn.CrossEntropyLoss(weight=None)
     optimizer = optim.Adam(model.parameters(), lr=lr, betas=betas)
 
-    # train model
-    train_model(
-        dataloaders,
-        model,
-        criterion,
-        optimizer,
-        n_epochs,
-        output_dir
-    )
+    return model, criterion, optimizer
 
 
 def train_model(
@@ -142,8 +133,9 @@ def train_model(
     model,
     criterion,
     optimizer,
-    n_epochs,
-    output_dir
+    output_dir,
+    n_epochs=100,
+    device=torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 ):
     
     '''
@@ -153,17 +145,16 @@ def train_model(
     Train deep learning model.
 
     Args:
-        dataloaders (dict(torch DataLoader)): Dictionary of training and testing dataloaders.
-        model (torch Module): ResNet101 model initialized with default weights.
+        dataloaders (dict(torch DataLoader)): Dictionary of training and validation dataloaders.
+        model (torch Module): Model initialized with default weights.
         criterion (torch Module): Loss function to evaluate model accuracy during training.
-        optimizer (torch Optimizer): Optimizer to identify training step.
-        n_epochs (int): Number of epochs to train model.
+        optimizer (torch Optimizer): Optimizer to update training step.
         output_dir (str): Complete path to save model checkpoints.
+        n_epochs (int): Number of epochs to train model.
+        device (torch device): Device to train on (CPU or GPU).
     '''
 
     # send model to device
-    # GPU if available, otherwise CPU
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model = model.to(device)
 
     since = time.time()
@@ -269,43 +260,65 @@ def finetune_yolov8(
 def finetune(
     data_dir,
     output_dir,
-    model_name='YOLOv8'
+    dataset_name,
+    model_type='ResNet101'
 ):
     
     '''
     Prepare data and fine-tune selected model.
     '''
 
-    if model_name == 'YOLOv8':
-        # fine-tune YOLOv8
-        finetune_yolov8(data_dir, output_dir)
+    # dataset directories
+    dataset_dir = join(data_dir, dataset_name)
+    dataset_output_dir = join(output_dir, dataset_name)
 
-    elif model_name == 'ResNet101':
+    if model_type == 'YOLOv8':
+
+        # fine-tune YOLOv8
+        finetune_yolov8(dataset_dir, dataset_output_dir)
+
+    elif model_type == 'ResNet101':
 
         # get train and val paths
-        train_dir = join(data_dir, 'train')
-        val_dir = join(data_dir, 'val')
+        train_dir = join(dataset_dir, 'train')
+        val_dir = join(dataset_dir, 'val')
 
-        # calculate training data moments
-        train_mean, train_std_dev = calculate_data_moments(train_dir)
+        # get training data channel means and std. devs.
+        # load existing moments
+        moments_path = join(Path(__file__).parent, 'model_weights', 'training_moments.yaml')
+        with open(moments_path, "r") as f:
+            training_moments = yaml.safe_load(f)
+
+        # get dataset moments
+        if dataset_name in training_moments:
+            train_mean = training_moments[dataset_name]['mean']
+            train_std_dev = training_moments[dataset_name]['std dev']
+
+        # calculate training data moments if not in yaml
+        else: 
+            train_mean, train_std_dev = calculate_data_moments(train_dir)
+
+            # save dataset moments to yaml
+            training_moments[dataset_name]['mean'] = train_mean
+            training_moments[dataset_name]['std dev'] = train_std_dev
+            with open(moments_path, "w") as f:
+                yaml.dump(training_moments, f, default_flow_style=False, sort_keys=False)
+
 
         # create train and val dataloaders
         # normalized by training data moments
-        train_dataloader = load_data_from_directory(
-            train_dir,
-            train_mean,
-            train_std_dev
-        )
+        dataloaders = defaultdict()
+        dataloaders['train'] = load_data_from_directory(train_dir, train_mean, train_std_dev)
+        dataloaders['val'] = load_data_from_directory(val_dir, train_mean, train_std_dev)
 
-        val_dataloader = load_data_from_directory(
-            val_dir,
-            train_mean,
-            train_std_dev
-        )
+        # initialize ResNet101
+        model, criterion, optimizer = initialize_resnet101_for_training()
 
-        # fine-tune ResNet101
-        finetune_resnet101(
-            train_dataloader,
-            val_dataloader,
-            output_dir
+        # train model
+        train_model(
+            dataloaders,
+            model,
+            criterion,
+            optimizer,
+            dataset_output_dir
         )
