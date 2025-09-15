@@ -222,8 +222,8 @@ def get_feature_vectors(
             # save feature embeddings by dataset and class
             embeddings_dict[dataset_name][class_label] = image_embeddings
 
-    # perform TSNE to reduce embeddings dimensions separately for each dataset
-    # other option: perform TSNE on all embeddings together
+    # perform tsne to reduce embeddings dimensions separately for each dataset
+    # other option: perform tsne on array of all embeddings
     tsne = TSNE(n_components=2)
 
     # create subplot for each dataset
@@ -231,7 +231,7 @@ def get_feature_vectors(
     axes = axes.ravel()
     plt.subplots_adjust(wspace=0.15)
 
-    # make plot for each dataset
+    # plot tsne-projected embeddings for each dataset
     for data_idx, (dataset_name, dataset_dict) in enumerate(embeddings_dict.items()):
 
         ax = axes[data_idx]
@@ -241,7 +241,7 @@ def get_feature_vectors(
         embeddings_1 = dataset_dict['1']
         dataset_embeddings = np.vstack((embeddings_0, embeddings_1))
 
-        # reduce embeddings to 2 dims with TSNE
+        # reduce embeddings to 2 dims with tsne
         tsne_embeddings = tsne.fit_transform(dataset_embeddings)
 
         # plot each class embeddings on dataset plot
