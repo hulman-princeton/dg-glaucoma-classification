@@ -26,7 +26,7 @@ def initialize_resnet101_for_prediction(
     Initialize ResNet101 model for prediction.
 
     Args:
-        model_path (str): Complete path to trained model state dictionary.
+        model_path (str): Path to fine-tuned model state dictionary.
         n_cls (int): Number of classes in the training dataset.
         device (torch device): Device to predict on.
 
@@ -159,9 +159,9 @@ def predict(
     Predict glaucoma from datasets and save performance metrics and ROC curves.
 
     Args: 
-        data_dir (str): Complete path to data folder containing test datasets.
+        data_dir (str): Path to data folder containing test datasets.
         dataset_names (list): List of dataset names in data_dir to predict glaucoma.
-        model_path (str): Complete path to fine-tuned model state dict.
+        model_path (str): Path to fine-tuned model state dictionary.
         training_dataset_name (str): Name of dataset used to fine-tune model.
         show_plot (bool): Whether to display ROC curves plot in addition to saving.
         model_type (str): Type of deep learning model.

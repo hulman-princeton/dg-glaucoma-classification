@@ -10,7 +10,8 @@ from torchvision.datasets import ImageFolder
 from torch.utils.data.dataloader import DataLoader
 from tempfile import TemporaryDirectory
 from ultralytics import YOLO
-from os.path import join
+from os import mkdir
+from os.path import join, exists
 from pathlib import Path
 from collections import defaultdict
 
@@ -149,7 +150,7 @@ def train_model(
         model (torch Module): Model initialized with default weights.
         criterion (torch Module): Loss function to evaluate model accuracy during training.
         optimizer (torch Optimizer): Optimizer to update training step.
-        output_dir (str): Complete path to save model checkpoints.
+        output_dir (str): Path to save model checkpoints.
         n_epochs (int): Number of epochs to train model.
         device (torch device): Device to train on (CPU or GPU).
     '''
@@ -237,8 +238,8 @@ def finetune_yolov8(
     Initialize and train YOLOv8 model.
 
     Args:
-        data_dir (str): Complete path to data folder.
-        output_dir (str): Complete path to save model checkpoints.
+        data_dir (str): Path to data folder.
+        output_dir (str): Path to save model checkpoints.
         batch_size (int): Batch size for training.
         n_epochs (int): Number of epochs to train model.
         dim (int): Dimension of square training images.
@@ -259,17 +260,29 @@ def finetune_yolov8(
 
 def finetune(
     data_dir,
-    output_dir,
     dataset_name,
+    output_dir=None,
     model_type='ResNet101'
 ):
     
     '''
     Prepare data and fine-tune selected model.
+
+    Args:
+        data_dir (str): Path to data folder.
+        dataset_name (str): Name of dataset.
+        output_dir (str): Path to save model checkpoints.
+        model_type (str): Type of deep learning model.
     '''
 
     # dataset directories
     dataset_dir = join(data_dir, dataset_name)
+
+    if output_dir is None:
+        output_dir = join(Path(__file__).parent, 'model_weights')
+    if not exists(output_dir):
+        mkdir(output_dir)
+
     dataset_output_dir = join(output_dir, dataset_name)
 
     if model_type == 'YOLOv8':
@@ -285,7 +298,7 @@ def finetune(
 
         # get training data channel means and std. devs.
         # load existing moments
-        moments_path = join(Path(__file__).parent, 'model_weights', 'training_moments.yaml')
+        moments_path = join(output_dir, 'training_moments.yaml')
         with open(moments_path, "r") as f:
             training_moments = yaml.safe_load(f)
 

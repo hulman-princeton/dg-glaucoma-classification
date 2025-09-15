@@ -36,7 +36,7 @@ def get_vector(img, layer, model):
         my_embedding (torch Tensor): Feature vector tensor.
     '''
 
-    # 1. Create a PyTorch Variable with the transformed image
+    # 1. Get PyTorch image
     t_img = img
     # 2. Create a vector of zeros that will hold our feature vector
     #    The 'avgpool' layer has an output size of *2048*
