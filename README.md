@@ -53,9 +53,9 @@ When a trained convolutional neural network makes a prediction on a new image, t
 ### Domain Generalization Method Performance
 Unlike traditional deep learning models, which are built on the assumption that the inference data comes from the same underlying distribution as the training data, domain generalization methods aim to mitigate the detrimental effects of potential "domain shift". We fine-tuned three domain generalization methods, all built on top of the ResNet architecture, and compared their performance and learned features to the baseline models. All three methods attempt to identify and separate dataset-specific features from class-predictive features during training, using only the predictive features for classification. We find that CIRL has the highest out-of-domain performance on average, but the percent improvement compared to YOLOv8 is fairly small, indicating that these domain generalization methods do not adequately address the issue of domain shift in retinal images.
 
-1. Fourier-based Augmented Co-teacher (FACT) [Xu et al., 2021](https://doi.org/10.48550/arXiv.2105.11120)
-2. Causality Inspired Representation Learning (CIRL) [Lv et al., 2022](https://doi.org/10.48550/arXiv.2203.14237)
-3. Variational Autoencoder for Domain Generalization (VAE-DG) [Chokuwa and Khan, 2023](https://doi.org/10.48550/arXiv.2309.11301)
+1. Fourier-based Augmented Co-teacher (FACT) ([Xu et al., 2021](https://doi.org/10.48550/arXiv.2105.11120))
+2. Causality Inspired Representation Learning (CIRL) ([Lv et al., 2022](https://doi.org/10.48550/arXiv.2203.14237))
+3. Variational Autoencoder for Domain Generalization (VAE-DG) ([Chokuwa and Khan, 2023](https://doi.org/10.48550/arXiv.2309.11301))
 
 <img src="results/dg_performance.png" alt="Domain Generalization Performance" width="500">
 <img src="results/dg_feature_extraction.png" alt="Feature Extraction" width="500">
