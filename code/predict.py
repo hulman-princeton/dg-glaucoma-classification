@@ -13,7 +13,7 @@ from os.path import join, exists
 from os import mkdir, path, listdir
 from pathlib import Path
 
-from code import train
+from code.train import load_data_from_directory
 
 
 def initialize_resnet101_for_prediction(
@@ -169,7 +169,7 @@ def predict(
 
     if model_type == 'ResNet101':
         # get training data channel means and std. devs.
-        moments_path = join(Path(__file__).parent, 'model_weights', 'training_moments.yaml')
+        moments_path = join(Path(__file__).parent.parent, 'model_weights', 'training_moments.yaml')
         with open(moments_path, "r") as f:
             training_moments = yaml.safe_load(f)
 
@@ -197,7 +197,7 @@ def predict(
 
         if model_type == 'ResNet101':
             # create test data loader
-            test_loader = train.load_data_from_directory(
+            test_loader = load_data_from_directory(
                 test_dir, 
                 train_mean, 
                 train_std_dev, 
@@ -227,7 +227,7 @@ def predict(
         plt.plot(fpr, tpr, label=f'{dataset_name} (AUC: {auc:.2f})')
 
     # directory to save results
-    results_dir = join(Path(__file__).parent,'results')
+    results_dir = join(Path(__file__).parent.parent,'results')
     if not exists(results_dir):
         mkdir(results_dir)
 
