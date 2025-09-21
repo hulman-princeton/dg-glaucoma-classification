@@ -57,7 +57,7 @@ Unlike traditional deep learning models, which are built on the assumption that 
 2. Causality Inspired Representation Learning (CIRL) ([Lv et al., 2022](https://doi.org/10.48550/arXiv.2203.14237))
 3. Variational Autoencoder for Domain Generalization (VAE-DG) ([Chokuwa and Khan, 2023](https://doi.org/10.48550/arXiv.2309.11301))
 
+The ResNet101, YOLOv8, and CIRL model weights are available here: [![Hugging Face](https://img.shields.io/badge/🤗-Model%20on%20Hugging%20Face-blue)](https://huggingface.co/hulman-princeton/glaucoma-classification-models). For direct comparison with the domain generalization methods, each model was trained four times in leave-one-out style, with three datasets used for model training and the held-out dataset used to evaluate testing performance.
+
 <img src="results/dg_performance.png" alt="Domain Generalization Performance" width="500">
 <img src="results/dg_feature_extraction.png" alt="Feature Extraction" width="500">
-
-The ResNet101, YOLOv8, and CIRL model weights are available here: [![Hugging Face](https://img.shields.io/badge/🤗-Model%20on%20Hugging%20Face-blue)](https://huggingface.co/hulman-princeton/glaucoma-classification-models). For direct comparison with the domain generalization methods, each model was trained four times in leave-one-out style, with three datasets used for model training and the held-out dataset used to evaluate testing performance.
