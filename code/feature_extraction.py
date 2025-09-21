@@ -5,7 +5,7 @@ import numpy as np
 import yaml
 
 from sklearn.manifold import TSNE
-from torchvision import models
+from torchvision import models, transforms
 from torchvision.datasets import ImageFolder
 from ultralytics import YOLO
 from os.path import join, exists
@@ -109,7 +109,8 @@ def get_yolov8_embeddings(data_folder, model, layer=8):
 
 def initialize_resnet101_for_feature_extraction(
     model_path,
-    n_cls=2
+    n_cls=2,
+    device=torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 ):
     
     '''
@@ -131,7 +132,7 @@ def initialize_resnet101_for_feature_extraction(
     model.fc = nn.Linear(num_ftrs, n_cls)
 
     # load fine-tuned state dict to device
-    model.load_state_dict(torch.load(model_path))
+    model.load_state_dict(torch.load(model_path, map_location=device))
     model.eval()
 
     # get final layer to retrieve feature embeddings
@@ -164,7 +165,7 @@ def get_feature_vectors(
     if model_type == 'ResNet101':
 
         # get training data channel means and std. devs.
-        moments_path = join(Path(__file__).parent, 'model_weights', 'training_moments.yaml')
+        moments_path = join(Path(__file__).parent.parent, 'model_weights', 'training_moments.yaml')
         with open(moments_path, "r") as f:
             training_moments = yaml.safe_load(f)
 
@@ -178,7 +179,7 @@ def get_feature_vectors(
             train_std_dev = training_moments['IMAGENET']['std dev']
 
         # resize, convert image to tensor, and normalize
-        transforms = [
+        transforms_list = [
             transforms.Resize((224,224)), 
             transforms.ToTensor(),
             transforms.Normalize(mean=train_mean, std=train_std_dev)
@@ -197,37 +198,33 @@ def get_feature_vectors(
         embeddings_dict[dataset_name] = defaultdict()
 
         test_dir = join(data_dir, dataset_name, 'test')
+        
+        if model_type == 'ResNet101':
 
-        # iterate through class labels
-        for class_label in ['0', '1']:
+            # create image folder
+            data_folder = ImageFolder(test_dir, transforms.Compose(transforms_list))
 
-            class_dir = join(test_dir, class_label)
-            
-            if model_type == 'ResNet101':
+            # get embeddings
+            image_embeddings = get_resnet101_embeddings(data_folder, layer, model)
+        
+        elif model_type == 'YOLOv8':
 
-                # create image folder
-                data_folder = ImageFolder(class_dir, transforms.Compose(transforms))
+            # create image folder
+            data_folder = ImageFolder(test_dir)
 
-                # get embeddings
-                image_embeddings = get_resnet101_embeddings(data_folder, layer, model)
-            
-            elif model_type == 'YOLOv8':
+            # get embeddings
+            image_embeddings = get_yolov8_embeddings(data_folder, model)
 
-                # create image folder
-                data_folder = ImageFolder(class_dir)
-
-                # get embeddings
-                image_embeddings = get_yolov8_embeddings(data_folder, model)
-
-            # save feature embeddings by dataset and class
-            embeddings_dict[dataset_name][class_label] = image_embeddings
+        # save feature embeddings by dataset
+        embeddings_dict[dataset_name]['embeddings'] = image_embeddings
+        embeddings_dict[dataset_name]['classes'] = np.array(data_folder.targets)
 
     # perform tsne to reduce embeddings dimensions separately for each dataset
     # other option: perform tsne on array of all embeddings
     tsne = TSNE(n_components=2)
 
     # create subplot for each dataset
-    fig, axes = plt.subplots(1, len(dataset_names), figsize=(20,4), squeeze=False)
+    fig, axes = plt.subplots(1, len(dataset_names), figsize=(5*len(dataset_names),4), squeeze=False)
     axes = axes.ravel()
     plt.subplots_adjust(wspace=0.15)
 
@@ -236,27 +233,27 @@ def get_feature_vectors(
 
         ax = axes[data_idx]
 
-        # get array of embeddings from both classes
-        embeddings_0 = dataset_dict['0']
-        embeddings_1 = dataset_dict['1']
-        dataset_embeddings = np.vstack((embeddings_0, embeddings_1))
-
         # reduce embeddings to 2 dims with tsne
-        tsne_embeddings = tsne.fit_transform(dataset_embeddings)
+        tsne_embeddings = tsne.fit_transform(dataset_dict['embeddings'])
 
         # plot each class embeddings on dataset plot
-        size_0 = embeddings_0.shape[0]
+        class_indices = dataset_dict['classes']
 
+        glaucoma_indices = np.where(class_indices == 0)[0]
+        healthy_indices = np.where(class_indices == 1)[0]
+
+        # 0 (healthy) class
         ax.scatter(
-            tsne_embeddings[:size_0,0], 
-            tsne_embeddings[:size_0,1], 
+            tsne_embeddings[glaucoma_indices,0], 
+            tsne_embeddings[glaucoma_indices,1], 
             label='healthy', 
             color='limegreen'
         )
 
+        # 1 (glaucoma) class
         ax.scatter(
-            tsne_embeddings[size_0:,0], 
-            tsne_embeddings[size_0:,1], 
+            tsne_embeddings[healthy_indices,0], 
+            tsne_embeddings[healthy_indices,1], 
             label='glaucoma', 
             color='darkgreen'
         )
@@ -265,7 +262,7 @@ def get_feature_vectors(
         ax.set_title(dataset_name)
 
     # directory to save plot
-    results_dir = join(Path(__file__).parent,'results')
+    results_dir = join(Path(__file__).parent.parent,'results')
     if not exists(results_dir):
         mkdir(results_dir)
 
