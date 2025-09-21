@@ -59,3 +59,5 @@ Unlike traditional deep learning models, which are built on the assumption that 
 
 <img src="results/dg_performance.png" alt="Domain Generalization Performance" width="500">
 <img src="results/dg_feature_extraction.png" alt="Feature Extraction" width="500">
+
+The ResNet101, YOLOv8, and CIRL model weights are available here: [![Hugging Face](https://img.shields.io/badge/🤗-Model%20on%20Hugging%20Face-blue)](https://huggingface.co/hulman-princeton/glaucoma-classification-models). For direct comparison with the domain generalization methods, each model was trained four times in leave-one-out style, with three datasets used for model training and the held-out dataset used to evaluate testing performance.
