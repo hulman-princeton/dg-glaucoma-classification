@@ -4,6 +4,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import yaml
+import numpy as np
 
 from torchvision import models, transforms
 from torchvision.datasets import ImageFolder
@@ -48,11 +49,15 @@ def calculate_data_moments(data_dir):
         sum_sq += (img ** 2).sum(dim=1)  # sum of squared intensities
         total_pixels += H * W  # total pixels in image
 
+    # convert to numpy arrays
+    sum = sum.cpu().numpy()
+    sum_sq = sum_sq.cpu().numpy()
+
     # calculate mean and std dev from sums
     means = sum / total_pixels
-    std_devs = torch.sqrt(sum_sq / total_pixels - means ** 2)  # sqrt(E[X^2] - E[X]^2)
+    std_devs = np.sqrt(sum_sq / total_pixels - means ** 2)  # sqrt(E[X^2] - E[X]^2)
 
-    return means, std_devs
+    return means.tolist(), std_devs.tolist()
 
 
 def load_data_from_directory(
@@ -78,14 +83,14 @@ def load_data_from_directory(
     '''
 
     # resize, convert image to tensor, and normalize
-    transforms = [
+    transforms_list = [
         transforms.Resize((224,224)), 
         transforms.ToTensor(),
         transforms.Normalize(mean=means, std=std_devs)
     ]
 
     # create image folder with transforms
-    data_folder = ImageFolder(data_dir, transforms.Compose(transforms))
+    data_folder = ImageFolder(data_dir, transforms.Compose(transforms_list))
 
     # create data loader from image folder
     if batch_size == 'full':
@@ -279,7 +284,7 @@ def finetune(
     dataset_dir = join(data_dir, dataset_name)
 
     if output_dir is None:
-        output_dir = join(Path(__file__).parent, 'model_weights')
+        output_dir = join(Path(__file__).parent.parent, 'model_weights')
     if not exists(output_dir):
         mkdir(output_dir)
 
@@ -312,11 +317,10 @@ def finetune(
             train_mean, train_std_dev = calculate_data_moments(train_dir)
 
             # save dataset moments to yaml
-            training_moments[dataset_name]['mean'] = train_mean
-            training_moments[dataset_name]['std dev'] = train_std_dev
+            training_moments[dataset_name] = {'mean': train_mean, 'std dev': train_std_dev}
+
             with open(moments_path, "w") as f:
                 yaml.dump(training_moments, f, default_flow_style=False, sort_keys=False)
-
 
         # create train and val dataloaders
         # normalized by training data moments
