@@ -20,18 +20,8 @@ You may download the full datasets here:
 - RIM-ONE: https://github.com/miag-ull/rim-one-dl
 
 ### Data Directory Structure
- - `data/`
+- `data/`
   - `ACRIMA/`  
-    - `train/`
-        - `0/` healthy
-        - `1/` glaucoma
-    - `val/`
-        - `0/`
-        - `1/`
-    - `test/`
-        - `0/`
-        - `1/`
-  - `ORIGA/`  
     - `train/`
         - `0/` healthy
         - `1/` glaucoma
